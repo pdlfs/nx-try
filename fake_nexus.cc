@@ -70,7 +70,7 @@ static void print_hg_addr(nexus_ctx_t *n, hg_class_t *hgcl, char *str,
     if (hret != HG_SUCCESS)
         msg_abort("HG_Addr_to_string failed");
 
-    fprintf(stderr, "%d: Mercury address: %s => %s\n", n->grank, str, addr_str);
+    fprintf(stderr, "%d: lookup result: %s => %s\n", n->grank, str, addr_str);
     free(addr_str);
 }
 
@@ -268,7 +268,7 @@ static void discover_local_info(nexus_ctx_t *nctx)
         nctx->localranks[hginfo[eff_i].lrank] = hginfo[eff_i].grank;
 
 #ifdef NEXUS_DEBUG
-        fprintf(stderr, "%d: Idx %d: pid %d, id %d, grank %d, lrank %d\n",
+        fprintf(stderr, "%d: lookup-idx %d: na+sm://%d/%d, {g,l}rank=%d/%d\n",
                 nctx->grank, eff_i, hginfo[eff_i].pid, hginfo[eff_i].hgid,
                 hginfo[eff_i].grank, hginfo[eff_i].lrank);
 #endif
