@@ -43,7 +43,7 @@
 static inline void msg_abort(const char* msg)
 {
     if (errno != 0) {
-        fprintf(stderr, "Error: %s (%s)\n", msg, strerror(errno));   
+        fprintf(stderr, "Error: %s (%s)\n", msg, strerror(errno));
     } else {
         fprintf(stderr, "Error: %s\n", msg);
     }
@@ -51,7 +51,8 @@ static inline void msg_abort(const char* msg)
     abort();
 }
 
-static void print_hg_addr(hg_class_t *hgcl, char *str, hg_addr_t hgaddr)
+static void print_hg_addr(nexus_ctx_t *n, hg_class_t *hgcl, char *str,
+                          hg_addr_t hgaddr)
 {
     char *addr_str = NULL;
     hg_size_t addr_size = 0;
@@ -69,7 +70,8 @@ static void print_hg_addr(hg_class_t *hgcl, char *str, hg_addr_t hgaddr)
     if (hret != HG_SUCCESS)
         msg_abort("HG_Addr_to_string failed");
 
-    fprintf(stdout, "Mercury address: %s => %s\n", str, addr_str);
+    fprintf(stderr, "%d: Mercury address: %s => %s\n", n->grank, str, addr_str);
+    free(addr_str);
 }
 
 static void init_local_comm(nexus_ctx_t *nctx)
@@ -90,6 +92,7 @@ static void init_local_comm(nexus_ctx_t *nctx)
 typedef struct {
     hg_context_t *hgctx;
     int bgdone;
+    nexus_ctx_t *n;
 } bgthread_dat_t;
 
 /*
@@ -102,7 +105,7 @@ static void *nexus_bgthread(void *arg)
     hg_return_t hret;
 
 #ifdef NEXUS_DEBUG
-    fprintf(stdout, "Network thread running\n");
+    fprintf(stderr, "%d: Network thread running\n", bgdat->n->grank);
 #endif
 
     /* while (not done sending or not done recving */
@@ -122,7 +125,7 @@ static void *nexus_bgthread(void *arg)
     }
 
 #ifdef NEXUS_DEBUG
-    fprintf(stdout, "Network thread exiting\n");
+    fprintf(stderr, "%d: Network thread exiting\n", bgdat->n->grank);
 #endif
 
     return NULL;
@@ -211,7 +214,7 @@ static void discover_local_info(nexus_ctx_t *nctx)
     /* Initialize local Mercury listening endpoints */
     snprintf(hgaddr, sizeof(hgaddr), "na+sm://%d/0", getpid());
 #ifdef NEXUS_DEBUG
-    fprintf(stderr, "Initializing for %s\n", hgaddr);
+    fprintf(stderr, "%d: listening on %s\n", nctx->grank, hgaddr);
 #endif
 
     nctx->local_hgcl = HG_Init(hgaddr, HG_TRUE);
@@ -229,6 +232,7 @@ static void discover_local_info(nexus_ctx_t *nctx)
 
     bgarg->hgctx = nctx->local_hgctx;
     bgarg->bgdone = 0;
+    bgarg->n = nctx;
 
     ret = pthread_create(&bgthread, NULL, nexus_bgthread, (void*)bgarg);
     if (ret != 0)
@@ -264,7 +268,7 @@ static void discover_local_info(nexus_ctx_t *nctx)
         nctx->localranks[hginfo[eff_i].lrank] = hginfo[eff_i].grank;
 
 #ifdef NEXUS_DEBUG
-        fprintf(stdout, "[%d] Idx %d: pid %d, id %d, grank %d, lrank %d\n",
+        fprintf(stderr, "%d: Idx %d: pid %d, id %d, grank %d, lrank %d\n",
                 nctx->grank, eff_i, hginfo[eff_i].pid, hginfo[eff_i].hgid,
                 hginfo[eff_i].grank, hginfo[eff_i].lrank);
 #endif
@@ -286,7 +290,7 @@ static void discover_local_info(nexus_ctx_t *nctx)
         /* Add to local map */
         nctx->laddrs[hginfo[eff_i].grank] = localaddr;
 #ifdef NEXUS_DEBUG
-        print_hg_addr(nctx->local_hgcl, hgaddr, localaddr);
+        print_hg_addr(nctx, nctx->local_hgcl, hgaddr, localaddr);
 #endif
     }
 
@@ -312,18 +316,14 @@ nexus_ret_t nexus_bootstrap(nexus_ctx_t *nctx, int minport, int maxport,
     MPI_Comm_size(MPI_COMM_WORLD, &(nctx->gsize));
 
     if (!nctx->grank)
-        fprintf(stdout, "Nexus: started bootstrap\n");
+        fprintf(stderr, "Fake-Nexus: started bootstrap (local-size=%d)\n",
+                nctx->gsize);
 
     init_local_comm(nctx);
     discover_local_info(nctx);
 
     if (!nctx->grank)
-        fprintf(stdout, "Nexus: done local info discovery\n");
-
-#ifdef NEXUS_DEBUG
-    fprintf(stdout, "[%d] grank = %d, lrank = %d, gsize = %d, lsize = %d\n",
-            nctx->grank, nctx->grank, nctx->lrank, nctx->gsize, nctx->lsize);
-#endif /* NEXUS_DEBUG */
+        fprintf(stderr, "Nexus: done local info discovery\n");
 
     return NX_SUCCESS;
 }
@@ -346,7 +346,7 @@ nexus_ret_t nexus_destroy(nexus_ctx_t *nctx)
     HG_Finalize(nctx->local_hgcl);
 
     if (!nctx->grank)
-        fprintf(stdout, "Nexus: done local info cleanup\n");
+        fprintf(stderr, "Nexus: done local info cleanup\n");
 
     free(nctx->localranks);
     return NX_SUCCESS;
