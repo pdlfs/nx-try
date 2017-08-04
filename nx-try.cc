@@ -63,7 +63,11 @@
 #include <unistd.h>
 
 #include <mpi.h>   /* XXX: nexus requires this */
+#ifdef FAKE_NEXUS
+#include "fake_nexus.h"
+#else
 #include <deltafs-nexus/deltafs-nexus_api.h>
+#endif
 
 /*
  * helper/utility functions, included inline here so we are self-contained
