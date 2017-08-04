@@ -1,6 +1,6 @@
 # nx-try
 
-The nx-tr program just brings up nexus and exits.
+The nx-try program just brings up nexus and exits.
 
 ## command line usage
 
