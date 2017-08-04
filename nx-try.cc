@@ -55,27 +55,14 @@
  *   mpirun -n 3 ./nx-try -c 1 bmi+tcp 10
  */
 
-#include <ctype.h>
-#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 
-#include <arpa/inet.h>
-
-#include <sys/resource.h>
-#include <sys/time.h>
-#include <sys/types.h>
-
-#include <mercury.h>
-#include <mercury_macros.h>
-
 #include <mpi.h>   /* XXX: nexus requires this */
-
 #include <deltafs-nexus/deltafs-nexus_api.h>
 
 /*
@@ -122,7 +109,6 @@ void complain(int ret, int r0only, const char *format, ...) {
  * gs: shared global data (e.g. from the command line)
  */
 struct gs {
-    int ninst;               /* currently locked at 1 */
     /* note: MPI rank stored in global "myrank" */
     int size;                /* world size (from MPI) */
     char *hgproto;           /* hg protocol to use */
@@ -132,25 +118,10 @@ struct gs {
 } g;
 
 /*
- * is: per-instance state structure.   currently we only allow
- * one instance per proc (but we keep this broken out in case
- * we want to change it...).
- */
-struct is {
-    int n;                   /* our instance number (0 .. n-1) */
-    nexus_ctx_t *nxp;        /* nexus context */
-};
-struct is *isa;    /* an array of state */
-
-/*
  * alarm signal handler
  */
 void sigalarm(int foo) {
-    int lcv;
     fprintf(stderr, "SIGALRM detected (%d)\n", myrank);
-    for (lcv = 0 ; lcv < g.ninst ; lcv++) {
-        fprintf(stderr, "%d: %d: @alarm: ", myrank, lcv);
-    }
     fprintf(stderr, "Alarm clock\n");
     MPI_Finalize();
     exit(1);
@@ -178,7 +149,7 @@ skip_prints:
 /*
  * forward prototype decls.
  */
-static void *run_instance(void *arg);   /* run one instance */
+static void run_instance(void);   /* run one instance */
 
 /*
  * main program.  usage:
@@ -187,7 +158,6 @@ static void *run_instance(void *arg);   /* run one instance */
  */
 int main(int argc, char **argv) {
     int ch, lcv, rv;
-    pthread_t *tarr;
 
     argv0 = argv[0];
 
@@ -227,7 +197,6 @@ int main(int argc, char **argv) {
 
     if (argc != 2)          /* hgproto and hgsubnet must be provided on cli */
       usage("bad args");
-    g.ninst = 1;
     g.hgproto = argv[0];
     g.hgsubnet = argv[1];
 
@@ -246,25 +215,7 @@ int main(int argc, char **argv) {
     alarm(g.timeout);
     if (myrank == 0) printf("main: starting ...\n");
 
-    tarr = (pthread_t *)malloc(g.ninst * sizeof(pthread_t));
-    if (!tarr) complain(1, 0, "malloc tarr thread array failed");
-    isa = (struct is *)malloc(g.ninst *sizeof(*isa));    /* array */
-    if (!isa) complain(1, 0, "malloc 'isa' instance state failed");
-    memset(isa, 0, g.ninst * sizeof(*isa));
-
-    /* fork off a thread for each instance */
-    for (lcv = 0 ; lcv < g.ninst ; lcv++) {
-        isa[lcv].n = lcv;
-        rv = pthread_create(&tarr[lcv], NULL, run_instance, (void*)&isa[lcv]);
-        if (rv != 0)
-            complain(1, 0, "pthread create failed %d", rv);
-    }
-
-    /* now wait for everything to finish */
-    if (myrank == 0) printf("main: collecting\n");
-    for (lcv = 0 ; lcv < g.ninst ; lcv++) {
-        pthread_join(tarr[lcv], NULL);
-    }
+    run_instance();
 
     if (myrank == 0) printf("main: collection done.\n");
 
@@ -279,17 +230,15 @@ int main(int argc, char **argv) {
  * run_instance: the main routine for running one instance of mercury.
  * we pass the instance state struct in as the arg...
  */
-void *run_instance(void *arg) {
-    struct is *isp = (struct is *)arg;
-    int n = isp->n;               /* recover n from isp */
+void run_instance() {
+    nexus_ctx_t *nxp;
     nexus_ret_t nrv;
 
     printf("%d: instance running\n", myrank);
-    isa[n].n = n;    /* make it easy to map 'is' structure back to n */
-    isa[n].nxp = new nexus_ctx_t;   /* XXXCDC: need ctor to run */
+    nxp = new nexus_ctx_t;   /* XXXCDC: need ctor to run */
 
     /* XXXCDC: port stuff likely to go away */
-    nrv = nexus_bootstrap(isp->nxp, g.baseport, g.baseport+1000 /*XXX*/,
+    nrv = nexus_bootstrap(nxp, g.baseport, g.baseport+1000 /*XXX*/,
                           g.hgsubnet, g.hgproto);
     if (nrv != NX_SUCCESS)
         complain(1, 0, "%d: nexus_bootstrap failed: %d", myrank, nrv);
@@ -298,10 +247,10 @@ void *run_instance(void *arg) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     printf("%d: nexus powering down!\n", myrank);
-    nrv = nexus_destroy(isa[n].nxp);
+    nrv = nexus_destroy(nxp);
     if (nrv != NX_SUCCESS)
             fprintf(stderr, "nexus_destroy failed(%d)\n", nrv);
-    delete isa[n].nxp;
+    delete nxp;
 
-    return(NULL);
+    return;
 }
