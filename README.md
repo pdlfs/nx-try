@@ -23,14 +23,16 @@ mpirun -n 2 nx-try bmi+tcp 10
 
 ## to compile
 
-First, you need to know where deltafs-nexus and mercury are installed.
-You also need cmake.  To compile with a build subdirectory, starting from
-the top-level source dir:
+First, you need cmake and you need to know the prefix where mercury 
+is installed.  You can also use a pre-installed deltafs-nexus, or use 
+the fake one provided with nx-try.  To use the fake one, add -DFAKE_NEXUS=ON
+to the cmake command line.  To compile with a build subdirectory, starting 
+from the top-level source dir:
 
 ```
   mkdir build
   cd build
-  cmake -DCMAKE_PREFIX_PATH=/path/to/mercury-install ..
+  cmake -DFAKE_NEXUS=ON -DCMAKE_PREFIX_PATH=/path/to/mercury-install ..
   make
 ```
 
