@@ -40,7 +40,7 @@ struct nexus_ctx
     hg_context_t *local_hgctx;       /* Local Hg context */
 };
 
-typedef struct nexus_ctx nexus_ctx_t;
+typedef struct nexus_ctx *nexus_ctx_t;
 
 typedef enum {
     NX_SUCCESS = 0, /* operation succeeded */
@@ -56,11 +56,10 @@ typedef enum {
 /*
  * Bootstraps the Nexus library
  */
-nexus_ret_t nexus_bootstrap(nexus_ctx_t *nctx, int minport, int maxport,
-                            char *subnet, char *proto);
+nexus_ctx_t nexus_bootstrap(char *subnet, char *proto);
 
 /*
  * Destroys the Nexus library freeing all allocated resources
  */
-nexus_ret_t nexus_destroy(nexus_ctx_t *nctx);
+void nexus_destroy(nexus_ctx_t nctx);
 

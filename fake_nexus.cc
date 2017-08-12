@@ -51,7 +51,7 @@ static inline void msg_abort(const char* msg)
     abort();
 }
 
-static void print_hg_addr(nexus_ctx_t *n, hg_class_t *hgcl, char *str,
+static void print_hg_addr(nexus_ctx_t n, hg_class_t *hgcl, char *str,
                           hg_addr_t hgaddr)
 {
     char *addr_str = NULL;
@@ -74,7 +74,7 @@ static void print_hg_addr(nexus_ctx_t *n, hg_class_t *hgcl, char *str,
     free(addr_str);
 }
 
-static void init_local_comm(nexus_ctx_t *nctx)
+static void init_local_comm(nexus_ctx_t nctx)
 {
     int ret;
 
@@ -92,7 +92,7 @@ static void init_local_comm(nexus_ctx_t *nctx)
 typedef struct {
     hg_context_t *hgctx;
     int bgdone;
-    nexus_ctx_t *n;
+    nexus_ctx_t n;
 } bgthread_dat_t;
 
 /*
@@ -154,7 +154,7 @@ static hg_return_t hg_lookup_cb(const struct hg_cb_info *info)
     return HG_SUCCESS;
 }
 
-static hg_return_t hg_lookup(nexus_ctx_t *nctx, hg_context_t *hgctx,
+static hg_return_t hg_lookup(nexus_ctx_t nctx, hg_context_t *hgctx,
                              char *hgaddr, hg_addr_t *addr)
 {
     hg_lookup_out_t *out = NULL;
@@ -198,7 +198,7 @@ typedef struct {
     int lrank;
 } ldata_t;
 
-static void discover_local_info(nexus_ctx_t *nctx)
+static void discover_local_info(nexus_ctx_t nctx)
 {
     int ret;
     char hgaddr[128];
@@ -306,10 +306,12 @@ static void discover_local_info(nexus_ctx_t *nctx)
     free(bgarg);
 }
 
-nexus_ret_t nexus_bootstrap(nexus_ctx_t *nctx, int minport, int maxport,
-                            char *subnet, char *proto)
+nexus_ctx_t nexus_bootstrap(char *subnet, char *proto)
 {
+    nexus_ctx_t nctx;
     char hgaddr[128];
+
+    nctx = new struct nexus_ctx;
 
     /* Grab MPI rank info */
     MPI_Comm_rank(MPI_COMM_WORLD, &(nctx->grank));
@@ -325,13 +327,14 @@ nexus_ret_t nexus_bootstrap(nexus_ctx_t *nctx, int minport, int maxport,
     if (!nctx->grank)
         fprintf(stderr, "Nexus: done local info discovery\n");
 
-    return NX_SUCCESS;
+    return nctx;
 }
 
-nexus_ret_t nexus_destroy(nexus_ctx_t *nctx)
+void nexus_destroy(nexus_ctx_t nctx)
 {
     std::map<int, hg_addr_t>::iterator it;
 
+    fprintf(stderr, "fake-nexus exit %d\n", nctx->grank);
     /* Free local Mercury addresses */
     for (it = nctx->laddrs.begin(); it != nctx->laddrs.end(); it++)
         if (it->second != HG_ADDR_NULL)
@@ -349,5 +352,5 @@ nexus_ret_t nexus_destroy(nexus_ctx_t *nctx)
         fprintf(stderr, "Nexus: done local info cleanup\n");
 
     free(nctx->localranks);
-    return NX_SUCCESS;
+    delete nctx;
 }

@@ -235,26 +235,20 @@ int main(int argc, char **argv) {
  * we pass the instance state struct in as the arg...
  */
 void run_instance() {
-    nexus_ctx_t *nxp;
-    nexus_ret_t nrv;
+    nexus_ctx_t nxp;
 
     printf("%d: instance running\n", myrank);
-    nxp = new nexus_ctx_t;   /* XXXCDC: need ctor to run */
 
-    /* XXXCDC: port stuff likely to go away */
-    nrv = nexus_bootstrap(nxp, g.baseport, g.baseport+1000 /*XXX*/,
-                          g.hgsubnet, g.hgproto);
-    if (nrv != NX_SUCCESS)
-        complain(1, 0, "%d: nexus_bootstrap failed: %d", myrank, nrv);
+    nxp = nexus_bootstrap(g.hgsubnet, g.hgproto);
+    if (nxp == NULL)
+        complain(1, 0, "%d: nexus_bootstrap failed", myrank);
     printf("%d: nexus powered up!\n", myrank);
 
     MPI_Barrier(MPI_COMM_WORLD);
 
     printf("%d: nexus powering down!\n", myrank);
-    nrv = nexus_destroy(nxp);
-    if (nrv != NX_SUCCESS)
-            fprintf(stderr, "nexus_destroy failed(%d)\n", nrv);
-    delete nxp;
+    nexus_destroy(nxp);
+    printf("%d: done!\n", myrank);
 
     return;
 }
